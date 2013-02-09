@@ -1,0 +1,27 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>TypeScript - SQL Builder</title>
+    <link rel="stylesheet" href="app.css" type="text/css" />
+    <script src="app.js"></script>
+    <script type="text/javascript">
+        function submit() {
+            var s = document.getElementById("code");
+            eval(s.innerHTML);
+        }
+
+    </script>
+</head>
+<body>
+    <h1>TypeScript - SQL Builder</h1>
+    <textarea id="code" cols="100" rows="5">
+    
+    </textarea>
+    <br />
+    <input type="button" value="Submit" onclick="submit();" />
+    <hr />
+    <textarea id="content" cols="100" rows="20"></textarea>
+</body>
+</html>
