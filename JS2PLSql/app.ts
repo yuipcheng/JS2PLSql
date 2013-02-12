@@ -32,8 +32,6 @@ class Column implements ISql {
             return null;
     }
 
-    IsIndexed: bool;
-
     IsNull: bool = true;
 
     Default: any;
@@ -100,7 +98,7 @@ class DateColumn extends Column {
     }
 }
 
-class Table implements ISql {
+class Table {
     TableName: string;
 
     private columns: Column[] = new Array();
@@ -116,12 +114,12 @@ class Table implements ISql {
 
         for (var i = 0; i < this.Columns.length; i++) {
             var col = this.Columns[i];
-            ret += "\r\n\t" + col.ToSql();
+            ret += '\r\n\t' + col.ToSql();
 
             if (col.IsPK || !col.IsNull)
-                ret += " NOT NULL";
+                ret += ' NOT NULL';
 
-            ret += ",";
+            ret += ',';
         }
 
         return ret;
@@ -133,12 +131,12 @@ class Table implements ISql {
         for (var i = 0; i < this.Columns.length; i++) {
             var col = this.Columns[i];
             if (col.IsPK)
-                ret += col.ColumnName + ",";
+                ret += col.ColumnName + ',';
         }
 
         if (ret.length > 0)
-            ret = '\r\n\tCONSTRAINT ' + this.TableName + '_PK PRIMARY KEY (' +
-                ret.substring(0, ret.length - 1) + '),'
+            ret = '\r\nALTER TABLE ' + this.TableName + '\r\n\tADD CONSTRAINT ' + this.TableName + '_PK PRIMARY KEY (' +
+                ret.substring(0, ret.length - 1) + ');'
 
         return ret;
     }
@@ -149,9 +147,9 @@ class Table implements ISql {
         for (var i = 0; i < this.Columns.length; i++) {
             var col = this.Columns[i];
             if (col.IsFK)
-                ret += '\r\n\tCONSTRAINT ' + col.FKTableName + '_FK \r\n\t\tFOREIGN KEY (' +
+                ret += '\r\nALTER TABLE ' + this.TableName + '\r\n\tADD ' + col.FKTableName + '_FK \r\n\t\tFOREIGN KEY (' +
                     col.ColumnName + ') \r\n\t\tREFERENCES ' + col.FKTableName + '(' +
-                    col.FKColumnName + '),'
+                    col.FKColumnName + ');'
         }
 
         return ret;
@@ -161,23 +159,26 @@ class Table implements ISql {
         this.TableName = tableName;
     }
 
-    ToSql(): string {
-        var ret = "CREATE TABLE " + this.TableName + "(";
+    GetTableSql(): string {
+        var ret = 'CREATE TABLE ' + this.TableName + '(';
 
         // columns
         ret += this.ColsSql;
-
-        // primary keys
-        ret += this.PKSql;
-
-        // foreign keys
-        ret += this.FKSql;
 
         // removes last comma
         if (ret.substring(ret.length - 1) === ',')
             ret = ret.substring(0, ret.length - 1);
 
-        ret += "\r\n);\r\n";
+        ret += '\r\n);\r\n';
+
+        return ret;
+    }
+
+    GetConstraintSql(): string {
+        var ret = '';
+
+        ret += this.PKSql;
+        ret += this.FKSql;
 
         return ret;
     }
@@ -189,38 +190,39 @@ class Builder {
     constructor(tables: Table[]) { this.Tables = tables; }
 
     ToPLSql(): string {
-        var ret = '';
+        var tableSql = '';
         var constraints = '';
 
         for (var i = 0; i < this.Tables.length; i++) {
             var tbl = this.Tables[i];
-            ret += tbl.ToSql();
+            tableSql += tbl.GetTableSql();
+            constraints += tbl.GetConstraintSql();
         }
 
-        return ret;
+        return tableSql + constraints;
     }
 }
 
 window.onload = () => {
-    var content = document.getElementById("content");
+    var content = document.getElementById('content');
 
     var tables =
         [
-            new Table("Customer").SetColumns(
+            new Table('Customer').SetColumns(
             [
-                new NumberColumn("CustomerID", 5).PK(),
-                new Varchar2Column("CustomerNm", 30)
+                new NumberColumn('CustomerID', 5).PK(),
+                new Varchar2Column('CustomerNm', 30)
             ]),
-            new Table("Product").SetColumns(
+            new Table('Product').SetColumns(
             [
-                new NumberColumn("ProductID", 5).PK(),
-                new Varchar2Column("ProductNm", 30)
+                new NumberColumn('ProductID', 5).PK(),
+                new Varchar2Column('ProductNm', 30)
             ]),
-            new Table("CustomerOrder").SetColumns(
+            new Table('CustomerOrder').SetColumns(
             [
-                new NumberColumn("CustomerID", 5).FK("Customer", "CustomerID"),
-                new NumberColumn("ProductID", 5).FK("Product", "ProductID"),
-                new DateColumn("ShipDate")
+                new NumberColumn('CustomerID', 5).FK('Customer', 'CustomerID'),
+                new NumberColumn('ProductID', 5).FK('Product', 'ProductID'),
+                new DateColumn('ShipDate')
             ])
         ];
 
