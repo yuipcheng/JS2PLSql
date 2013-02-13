@@ -1,9 +1,9 @@
 JS2PLSql
 ========
 
-A JavaScript library written in TypeScript to build PL/SQL scripts.
+A JavaScript library written in TypeScript to build PL/SQL scripts. 
 
-Live <a href='http://jsfiddle.net/yuipcheng/AbfHB/'>Demo</a>
+Here's a live <a target='_blank' href='http://jsfiddle.net/yuipcheng/AbfHB/'>fiddle</a>.
 
 Usage:
 
