@@ -101,7 +101,7 @@ class DateColumn extends Column {
 class Table {
     TableName: string;
 
-    private columns: Column[] = new Array();
+    private columns: Column[] = [];
     get Columns(): Column[] {
         return this.columns;
     }
@@ -185,7 +185,7 @@ class Table {
 }
 
 class Builder {
-    Tables: Table[] = new Array();
+    Tables: Table[] = [];
 
     constructor(tables: Table[]) { this.Tables = tables; }
 

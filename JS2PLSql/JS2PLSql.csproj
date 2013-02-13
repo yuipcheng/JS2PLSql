@@ -25,7 +25,6 @@
     <SccProvider>SAK</SccProvider>
   </PropertyGroup>
   <ItemGroup>
-    <Content Include="app.css" />
     <Content Include="app.min.js">
       <DependentUpon>app.ts</DependentUpon>
     </Content>
@@ -38,19 +37,12 @@
     <TypeScriptCompile Include="app.ts" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="web.config" />
     <Content Include="app.js.map">
       <DependentUpon>app.ts</DependentUpon>
     </Content>
     <Content Include="app.min.js.map">
       <DependentUpon>app.js</DependentUpon>
     </Content>
-    <None Include="web.Debug.config">
-      <DependentUpon>web.config</DependentUpon>
-    </None>
-    <None Include="web.Release.config">
-      <DependentUpon>web.config</DependentUpon>
-    </None>
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>

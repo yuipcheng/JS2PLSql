@@ -114,7 +114,7 @@ var DateColumn = (function (_super) {
 })(Column);
 var Table = (function () {
     function Table(tableName) {
-        this.columns = new Array();
+        this.columns = [];
         this.TableName = tableName;
     }
     Object.defineProperty(Table.prototype, "Columns", {
@@ -196,7 +196,7 @@ var Table = (function () {
 })();
 var Builder = (function () {
     function Builder(tables) {
-        this.Tables = new Array();
+        this.Tables = [];
         this.Tables = tables;
     }
     Builder.prototype.ToPLSql = function () {
