@@ -17,7 +17,7 @@ Features Checklist:
     - <del>datetime</del>
     - blob
  - Misc
-    - sequences
+    - <del>sequen</del>ces
     - triggers
     - synonym
 
