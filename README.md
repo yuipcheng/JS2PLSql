@@ -1,9 +1,25 @@
 JS2PLSql
 ========
 
-A JavaScript library written in TypeScript to build PL/SQL scripts. 
+A JavaScript library written in TypeScript to generate PL/SQL scripts. 
 
 Here's a live <a target='_blank' href='http://jsfiddle.net/yuipcheng/AbfHB/'>fiddle</a>.
+
+Features Checklist:
+ - Key/Constraint Types
+    - <del>primary & compound keys</del>
+    - <del>foreign keys</del>
+    - <del>unique keys</del>
+    - index
+ - Data Types
+    - <del>number</del>
+    - <del>varchar2</del>
+    - <del>datetime</del>
+    - blob
+ - Misc
+    - sequences
+    - triggers
+    - synonym
 
 Usage:
 
