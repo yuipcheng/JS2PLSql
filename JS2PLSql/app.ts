@@ -2,14 +2,43 @@ interface ISql {
     ToSql(): string;
 }
 
-class Column implements ISql {
-    private columnName: string;
-    get ColumnName(): string {
-        return this.columnName;
+class Sequence implements ISql {
+    private sequenceName: string;
+    get Name(): string {
+        return this.sequenceName;
+    }
+    private minVal: number = 1;
+    private maxVal: string = '999999999999999999999999999';
+    private startVal: number = 1;
+
+
+    constructor(seqName: string) {
+        this.sequenceName = seqName;
     }
 
-    get ColumnNameSql(): string {
-        return this.ColumnName;
+    get SynonymSql(): string {
+        var ret = '';
+        ret += '\r\nCREATE OR REPLACE PUBLIC SYNONYM ' + this.sequenceName + ' FOR ' + this.sequenceName;
+        return ret;
+    }
+
+    ToSql(): string {
+        var ret = '';
+        ret += '\r\nCREATE SEQUENCE ' + this.sequenceName;
+        ret += '\r\n\tSTART WITH ' + this.startVal;
+        ret += '\r\n\tMAXVALUE ' + this.maxVal;
+        ret += '\r\n\tMINVALUE ' + this.minVal;
+        ret += '\r\n\tNOCYCLE';
+        ret += '\r\n\tNOORDER';
+        ret += '\r\n/';
+        return ret;
+    }
+}
+
+class Column implements ISql {
+    private colNm: string;
+    get Name(): string {
+        return this.colNm;
     }
 
     private isPK: bool;
@@ -18,7 +47,7 @@ class Column implements ISql {
     private isFK: bool;
     get IsFK(): bool { return this.isFK; }
 
-    private fkRef: string;
+    private fkRef: string; // eg. table.column
     get FKTableName(): string {
         if (this.IsFK)
             return this.fkRef.split('.')[0];
@@ -32,19 +61,38 @@ class Column implements ISql {
             return null;
     }
 
+    private trgNm: string;
+    get Trigger(): string {
+        return this.trgNm;
+    }
+    SetTrigger(triggerName: string): Column {
+        this.trgNm = triggerName;
+        return this;
+    }
+
+    private seq: Sequence = null;
+    get Sequence(): Sequence {
+        return this.seq;
+    }
+    SetSequence(sequenceName: string): Column {
+        this.seq = new Sequence(sequenceName);
+        return this;
+    }
+
     IsNull: bool = true;
 
     Default: any;
 
     constructor(columnName: string) {
-        this.columnName = columnName;
+        this.colNm = columnName;
     }
 
-    PK(): Column {
-        this.isPK = true; return this;
+    SetPK(): Column {
+        this.isPK = true;
+        return this;
     }
 
-    FK(refTable: string, refColumn: string): Column {
+    SetFK(refTable: string, refColumn: string): Column {
         this.isFK = true;
         this.fkRef = refTable + '.' + refColumn;
         return this;
@@ -57,6 +105,8 @@ class NumberColumn extends Column {
     Scale: number;
     Precision: number;
 
+    private seq: Sequence;
+
     constructor(columnName: string, scale: number, precision: number = 0) {
         super(columnName);
         this.Scale = scale;
@@ -64,7 +114,7 @@ class NumberColumn extends Column {
     }
 
     ToSql(): string {
-        var ret = this.ColumnName + ' NUMBER(' + this.Scale;
+        var ret = this.Name + ' NUMBER(' + this.Scale;
 
         if (this.Precision > 0)
             ret += ',' + this.Precision;
@@ -84,7 +134,7 @@ class Varchar2Column extends Column {
     }
 
     ToSql() {
-        return this.ColumnName + ' VARCHAR2(' + this.MaxLength + ')';
+        return this.Name + ' VARCHAR2(' + this.MaxLength + ')';
     }
 }
 
@@ -94,7 +144,7 @@ class DateColumn extends Column {
     }
 
     ToSql() {
-        return this.ColumnName + ' DATE';
+        return this.Name + ' DATE';
     }
 }
 
@@ -111,55 +161,86 @@ class Table {
 
     get ColsSql(): string {
         var ret = '';
-
         for (var i = 0; i < this.Columns.length; i++) {
             var col = this.Columns[i];
             ret += '\r\n\t' + col.ToSql();
-
             if (col.IsPK || !col.IsNull)
                 ret += ' NOT NULL';
-
             ret += ',';
         }
-
         return ret;
     }
 
     get PKSql(): string {
         var ret = '';
-
         for (var i = 0; i < this.Columns.length; i++) {
             var col = this.Columns[i];
             if (col.IsPK)
-                ret += col.ColumnName + ',';
+                ret += col.Name + ',';
         }
-
         if (ret.length > 0)
-            ret = '\r\nALTER TABLE ' + this.TableName + '\r\n\tADD CONSTRAINT ' + this.TableName + '_PK PRIMARY KEY (' +
-                ret.substring(0, ret.length - 1) + ');'
-
+            ret = '\r\nALTER TABLE ' + this.TableName +
+                '\r\n\tADD CONSTRAINT ' + this.TableName + '_PK PRIMARY KEY (' + ret.substring(0, ret.length - 1) + ');'
         return ret;
     }
 
     get FKSql(): string {
         var ret = '';
-
         for (var i = 0; i < this.Columns.length; i++) {
             var col = this.Columns[i];
             if (col.IsFK)
-                ret += '\r\nALTER TABLE ' + this.TableName + '\r\n\tADD ' + col.FKTableName + '_FK \r\n\t\tFOREIGN KEY (' +
-                    col.ColumnName + ') \r\n\t\tREFERENCES ' + col.FKTableName + '(' +
-                    col.FKColumnName + ');'
+                ret += '\r\nALTER TABLE ' + this.TableName +
+                    '\r\n\tADD ' + col.FKTableName + '_FK' +
+                    '\r\n\t\tFOREIGN KEY (' + col.Name + ') \r\n\t\tREFERENCES ' + col.FKTableName + '(' +  col.FKColumnName + ');'
         }
-
         return ret;
     }
 
-    constructor(tableName: string) {
-        this.TableName = tableName;
+    get SequenceSql(): string {
+        var ret = '';
+        for (var i = 0; i < this.Columns.length; i++) {
+            var col = this.Columns[i];
+            if (col.Sequence != null)
+                ret += col.Sequence.ToSql();
+        }
+        ret += '\r\n';
+        return ret;
     }
 
-    GetTableSql(): string {
+    get SynonymSql(): string {
+        var ret = '';
+        for (var i = 0; i < this.Columns.length; i++) {
+            var col = this.Columns[i];
+            if (col.Sequence != null)
+                ret += col.Sequence.SynonymSql;
+        }
+        ret += '\r\n';
+        return ret;
+    }
+
+    get TriggerSql(): string {
+        var ret = '';
+        for (var i = 0; i < this.Columns.length; i++) {
+            var col = this.Columns[i];
+            if (col.Trigger != null) {
+                ret += '\r\nCREATE OR REPLACE TRIGGER ' + col.Name;
+                ret += '\r\n\tBEFORE INSERT';
+                ret += '\r\n\tON ' + this.TableName;
+                ret += '\r\n\tFOR EACH ROW';
+                ret += '\r\n\tBEGIN';
+                ret += '\r\n\t\tIF: NEW.' + col.Name + ' IS NULL';
+                ret += '\r\n\t\tTHEN';
+                ret += '\r\n\t\t\tSELECT ' + col.Sequence.Name + '.NEXTVAL INTO: NEW.' + col.Name + ' FROM DUAL;';
+                ret += '\r\n\t\tEND IF;';
+                ret += '\r\nEND;';
+                ret += '\r\n/';
+            }
+        }
+        ret += '\r\n';
+        return ret;
+    }
+
+    get TableSql(): string {
         var ret = 'CREATE TABLE ' + this.TableName + '(';
 
         // columns
@@ -174,13 +255,16 @@ class Table {
         return ret;
     }
 
-    GetConstraintSql(): string {
+    get ConstraintSql(): string {
         var ret = '';
-
         ret += this.PKSql;
         ret += this.FKSql;
-
+        ret += '\r\n';
         return ret;
+    }
+
+    constructor(tableName: string) {
+        this.TableName = tableName;
     }
 }
 
@@ -190,16 +274,23 @@ class Builder {
     constructor(tables: Table[]) { this.Tables = tables; }
 
     ToPLSql(): string {
-        var tableSql = '';
+        var tables = '';
         var constraints = '';
+        var sequences = '';
+        var synonyms = '';
+        var triggers = '';
 
         for (var i = 0; i < this.Tables.length; i++) {
             var tbl = this.Tables[i];
-            tableSql += tbl.GetTableSql();
-            constraints += tbl.GetConstraintSql();
+
+            tables += tbl.TableSql;
+            constraints += tbl.ConstraintSql;
+            sequences += tbl.SequenceSql;
+            synonyms += tbl.SynonymSql;
+            triggers += tbl.TriggerSql;
         }
 
-        return tableSql + constraints;
+        return tables + constraints + sequences + synonyms + triggers;
     }
 }
 
@@ -210,18 +301,18 @@ window.onload = () => {
         [
             new Table('Customer').SetColumns(
             [
-                new NumberColumn('CustomerID', 5).PK(),
+                new NumberColumn('CustomerID', 5).SetSequence('CustomerID_Seq').SetTrigger("CustomerID_BI").SetPK(),
                 new Varchar2Column('CustomerNm', 30)
             ]),
             new Table('Product').SetColumns(
             [
-                new NumberColumn('ProductID', 5).PK(),
+                new NumberColumn('ProductID', 5).SetSequence('ProductID_Seq').SetTrigger("ProductID_BI").SetPK(),
                 new Varchar2Column('ProductNm', 30)
             ]),
             new Table('CustomerOrder').SetColumns(
             [
-                new NumberColumn('CustomerID', 5).FK('Customer', 'CustomerID'),
-                new NumberColumn('ProductID', 5).FK('Product', 'ProductID'),
+                new NumberColumn('CustomerID', 5).SetFK('Customer', 'CustomerID'),
+                new NumberColumn('ProductID', 5).SetFK('Product', 'ProductID'),
                 new DateColumn('ShipDate')
             ])
         ];

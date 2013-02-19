@@ -3,21 +3,51 @@ var __extends = this.__extends || function (d, b) {
     __.prototype = b.prototype;
     d.prototype = new __();
 };
-var Column = (function () {
-    function Column(columnName) {
-        this.IsNull = true;
-        this.columnName = columnName;
+var Sequence = (function () {
+    function Sequence(seqName) {
+        this.minVal = 1;
+        this.maxVal = '999999999999999999999999999';
+        this.startVal = 1;
+        this.sequenceName = seqName;
     }
-    Object.defineProperty(Column.prototype, "ColumnName", {
+    Object.defineProperty(Sequence.prototype, "Name", {
         get: function () {
-            return this.columnName;
+            return this.sequenceName;
         },
         enumerable: true,
         configurable: true
     });
-    Object.defineProperty(Column.prototype, "ColumnNameSql", {
+    Object.defineProperty(Sequence.prototype, "SynonymSql", {
         get: function () {
-            return this.ColumnName;
+            var ret = '';
+            ret += '\r\nCREATE OR REPLACE PUBLIC SYNONYM ' + this.sequenceName + ' FOR ' + this.sequenceName;
+            return ret;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Sequence.prototype.ToSql = function () {
+        var ret = '';
+        ret += '\r\nCREATE SEQUENCE ' + this.sequenceName;
+        ret += '\r\n\tSTART WITH ' + this.startVal;
+        ret += '\r\n\tMAXVALUE ' + this.maxVal;
+        ret += '\r\n\tMINVALUE ' + this.minVal;
+        ret += '\r\n\tNOCYCLE';
+        ret += '\r\n\tNOORDER';
+        ret += '\r\n/';
+        return ret;
+    };
+    return Sequence;
+})();
+var Column = (function () {
+    function Column(columnName) {
+        this.seq = null;
+        this.IsNull = true;
+        this.colNm = columnName;
+    }
+    Object.defineProperty(Column.prototype, "Name", {
+        get: function () {
+            return this.colNm;
         },
         enumerable: true,
         configurable: true
@@ -37,7 +67,8 @@ var Column = (function () {
         configurable: true
     });
     Object.defineProperty(Column.prototype, "FKTableName", {
-        get: function () {
+        get: // eg. table.column
+        function () {
             if(this.IsFK) {
                 return this.fkRef.split('.')[0];
             } else {
@@ -58,11 +89,33 @@ var Column = (function () {
         enumerable: true,
         configurable: true
     });
-    Column.prototype.PK = function () {
+    Object.defineProperty(Column.prototype, "Trigger", {
+        get: function () {
+            return this.trgNm;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Column.prototype.SetTrigger = function (triggerName) {
+        this.trgNm = triggerName;
+        return this;
+    };
+    Object.defineProperty(Column.prototype, "Sequence", {
+        get: function () {
+            return this.seq;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Column.prototype.SetSequence = function (sequenceName) {
+        this.seq = new Sequence(sequenceName);
+        return this;
+    };
+    Column.prototype.SetPK = function () {
         this.isPK = true;
         return this;
     };
-    Column.prototype.FK = function (refTable, refColumn) {
+    Column.prototype.SetFK = function (refTable, refColumn) {
         this.isFK = true;
         this.fkRef = refTable + '.' + refColumn;
         return this;
@@ -81,7 +134,7 @@ var NumberColumn = (function (_super) {
         this.Precision = precision;
     }
     NumberColumn.prototype.ToSql = function () {
-        var ret = this.ColumnName + ' NUMBER(' + this.Scale;
+        var ret = this.Name + ' NUMBER(' + this.Scale;
         if(this.Precision > 0) {
             ret += ',' + this.Precision;
         }
@@ -98,7 +151,7 @@ var Varchar2Column = (function (_super) {
         this.MaxLength = maxLen;
     }
     Varchar2Column.prototype.ToSql = function () {
-        return this.ColumnName + ' VARCHAR2(' + this.MaxLength + ')';
+        return this.Name + ' VARCHAR2(' + this.MaxLength + ')';
     };
     return Varchar2Column;
 })(Column);
@@ -108,7 +161,7 @@ var DateColumn = (function (_super) {
         _super.call(this, columnName);
     }
     DateColumn.prototype.ToSql = function () {
-        return this.ColumnName + ' DATE';
+        return this.Name + ' DATE';
     };
     return DateColumn;
 })(Column);
@@ -150,7 +203,7 @@ var Table = (function () {
             for(var i = 0; i < this.Columns.length; i++) {
                 var col = this.Columns[i];
                 if(col.IsPK) {
-                    ret += col.ColumnName + ',';
+                    ret += col.Name + ',';
                 }
             }
             if(ret.length > 0) {
@@ -167,7 +220,7 @@ var Table = (function () {
             for(var i = 0; i < this.Columns.length; i++) {
                 var col = this.Columns[i];
                 if(col.IsFK) {
-                    ret += '\r\nALTER TABLE ' + this.TableName + '\r\n\tADD ' + col.FKTableName + '_FK \r\n\t\tFOREIGN KEY (' + col.ColumnName + ') \r\n\t\tREFERENCES ' + col.FKTableName + '(' + col.FKColumnName + ');';
+                    ret += '\r\nALTER TABLE ' + this.TableName + '\r\n\tADD ' + col.FKTableName + '_FK' + '\r\n\t\tFOREIGN KEY (' + col.Name + ') \r\n\t\tREFERENCES ' + col.FKTableName + '(' + col.FKColumnName + ');';
                 }
             }
             return ret;
@@ -175,23 +228,87 @@ var Table = (function () {
         enumerable: true,
         configurable: true
     });
-    Table.prototype.GetTableSql = function () {
-        var ret = 'CREATE TABLE ' + this.TableName + '(';
-        // columns
-        ret += this.ColsSql;
-        // removes last comma
-        if(ret.substring(ret.length - 1) === ',') {
-            ret = ret.substring(0, ret.length - 1);
-        }
-        ret += '\r\n);\r\n';
-        return ret;
-    };
-    Table.prototype.GetConstraintSql = function () {
-        var ret = '';
-        ret += this.PKSql;
-        ret += this.FKSql;
-        return ret;
-    };
+    Object.defineProperty(Table.prototype, "SequenceSql", {
+        get: function () {
+            var ret = '';
+            for(var i = 0; i < this.Columns.length; i++) {
+                var col = this.Columns[i];
+                if(col.Sequence != null) {
+                    ret += col.Sequence.ToSql();
+                }
+            }
+            ret += '\r\n';
+            return ret;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(Table.prototype, "SynonymSql", {
+        get: function () {
+            var ret = '';
+            for(var i = 0; i < this.Columns.length; i++) {
+                var col = this.Columns[i];
+                if(col.Sequence != null) {
+                    ret += col.Sequence.SynonymSql;
+                }
+            }
+            ret += '\r\n';
+            return ret;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(Table.prototype, "TriggerSql", {
+        get: function () {
+            var ret = '';
+            for(var i = 0; i < this.Columns.length; i++) {
+                var col = this.Columns[i];
+                if(col.Trigger != null) {
+                    ret += '\r\nCREATE OR REPLACE TRIGGER ' + col.Name;
+                    ret += '\r\n\tBEFORE INSERT';
+                    ret += '\r\n\tON ' + this.TableName;
+                    ret += '\r\n\tFOR EACH ROW';
+                    ret += '\r\n\tBEGIN';
+                    ret += '\r\n\t\tIF: NEW.' + col.Name + ' IS NULL';
+                    ret += '\r\n\t\tTHEN';
+                    ret += '\r\n\t\t\tSELECT ' + col.Sequence.Name + '.NEXTVAL INTO: NEW.' + col.Name + ' FROM DUAL;';
+                    ret += '\r\n\t\tEND IF;';
+                    ret += '\r\nEND;';
+                    ret += '\r\n/';
+                }
+            }
+            ret += '\r\n';
+            return ret;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(Table.prototype, "TableSql", {
+        get: function () {
+            var ret = 'CREATE TABLE ' + this.TableName + '(';
+            // columns
+            ret += this.ColsSql;
+            // removes last comma
+            if(ret.substring(ret.length - 1) === ',') {
+                ret = ret.substring(0, ret.length - 1);
+            }
+            ret += '\r\n);\r\n';
+            return ret;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(Table.prototype, "ConstraintSql", {
+        get: function () {
+            var ret = '';
+            ret += this.PKSql;
+            ret += this.FKSql;
+            ret += '\r\n';
+            return ret;
+        },
+        enumerable: true,
+        configurable: true
+    });
     return Table;
 })();
 var Builder = (function () {
@@ -200,14 +317,20 @@ var Builder = (function () {
         this.Tables = tables;
     }
     Builder.prototype.ToPLSql = function () {
-        var tableSql = '';
+        var tables = '';
         var constraints = '';
+        var sequences = '';
+        var synonyms = '';
+        var triggers = '';
         for(var i = 0; i < this.Tables.length; i++) {
             var tbl = this.Tables[i];
-            tableSql += tbl.GetTableSql();
-            constraints += tbl.GetConstraintSql();
+            tables += tbl.TableSql;
+            constraints += tbl.ConstraintSql;
+            sequences += tbl.SequenceSql;
+            synonyms += tbl.SynonymSql;
+            triggers += tbl.TriggerSql;
         }
-        return tableSql + constraints;
+        return tables + constraints + sequences + synonyms + triggers;
     };
     return Builder;
 })();
@@ -215,16 +338,16 @@ window.onload = function () {
     var content = document.getElementById('content');
     var tables = [
         new Table('Customer').SetColumns([
-            new NumberColumn('CustomerID', 5).PK(), 
+            new NumberColumn('CustomerID', 5).SetSequence('CustomerID_Seq').SetTrigger("CustomerID_BI").SetPK(), 
             new Varchar2Column('CustomerNm', 30)
         ]), 
         new Table('Product').SetColumns([
-            new NumberColumn('ProductID', 5).PK(), 
+            new NumberColumn('ProductID', 5).SetSequence('ProductID_Seq').SetTrigger("ProductID_BI").SetPK(), 
             new Varchar2Column('ProductNm', 30)
         ]), 
         new Table('CustomerOrder').SetColumns([
-            new NumberColumn('CustomerID', 5).FK('Customer', 'CustomerID'), 
-            new NumberColumn('ProductID', 5).FK('Product', 'ProductID'), 
+            new NumberColumn('CustomerID', 5).SetFK('Customer', 'CustomerID'), 
+            new NumberColumn('ProductID', 5).SetFK('Product', 'ProductID'), 
             new DateColumn('ShipDate')
         ])
     ];
